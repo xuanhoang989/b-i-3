@@ -1,10 +1,12 @@
 package com.example.appnho
+
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Color
-import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -13,21 +15,36 @@ import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var tvCurrentName: TextView
-    private lateinit var btnEditInfo: Button
+    private lateinit var imgProfile: ImageView
+    private lateinit var tvName: TextView
+    private lateinit var tvMssv: TextView
+    private lateinit var tvClass: TextView
+    private lateinit var tvPhone: TextView
+    private lateinit var tvEmail: TextView
+    private var currentAvatarUri: String? = null
 
-    // 1. Đăng ký ActivityResultLauncher theo chuẩn Activity Result API
-    private val editLauncher: ActivityResultLauncher<Intent> = registerForActivityResult(
+    // Đón dữ liệu trả về từ EditActivity bằng Activity Result API
+    private val editProfileLauncher: ActivityResultLauncher<Intent> = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val updatedName = result.data?.getStringExtra("EXTRA_UPDATED_NAME")
-            if (!updatedName.isNullOrEmpty()) {
-                tvCurrentName.text = "Họ tên: $updatedName"
-                tvCurrentName.setTextColor(Color.parseColor("#2E7D32"))
-                tvCurrentName.setTypeface(null, Typeface.BOLD)
-                Toast.makeText(this, "Đã cập nhật tên thành công!", Toast.LENGTH_SHORT).show()
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            val data = result.data!!
+            val newName = data.getStringExtra("EXTRA_NAME")
+            val newClass = data.getStringExtra("EXTRA_CLASS")
+            val newPhone = data.getStringExtra("EXTRA_PHONE")
+            val newEmail = data.getStringExtra("EXTRA_EMAIL")
+            val newImageUri = data.getStringExtra("EXTRA_AVATAR_URI")
+
+            if (!newName.isNullOrEmpty()) tvName.text = newName
+            if (!newClass.isNullOrEmpty()) tvClass.text = "Lớp: $newClass"
+            if (!newPhone.isNullOrEmpty()) tvPhone.text = "SĐT: $newPhone"
+            if (!newEmail.isNullOrEmpty()) tvEmail.text = "Email: $newEmail"
+            if (!newImageUri.isNullOrEmpty()) {
+                currentAvatarUri = newImageUri
+                imgProfile.setImageURI(Uri.parse(newImageUri))
             }
+
+            Toast.makeText(this, "Đã cập nhật hồ sơ sinh viên thành công!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -35,16 +52,54 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvCurrentName = findViewById(R.id.tvCurrentName)
-        btnEditInfo = findViewById(R.id.btnEditInfo)
+        imgProfile = findViewById(R.id.imgProfile)
+        tvName = findViewById(R.id.tvName)
+        tvMssv = findViewById(R.id.tvMssv)
+        tvClass = findViewById(R.id.tvClass)
+        tvPhone = findViewById(R.id.tvPhone)
+        tvEmail = findViewById(R.id.tvEmail)
 
-        btnEditInfo.setOnClickListener {
-            val currentName = tvCurrentName.text.toString()
+        val btnEditProfile = findViewById<Button>(R.id.btnEditProfile)
+        val btnCall = findViewById<Button>(R.id.btnCall)
+        val btnEmail = findViewById<Button>(R.id.btnEmail)
+
+        // Chuyển sang EditActivity truyền dữ liệu hiện tại
+        btnEditProfile.setOnClickListener {
             val intent = Intent(this, EditActivity::class.java).apply {
-                putExtra("EXTRA_CURRENT_NAME", currentName)
+                putExtra("EXTRA_NAME", tvName.text.toString())
+                putExtra("EXTRA_CLASS", tvClass.text.toString().replace("Lớp: ", ""))
+                putExtra("EXTRA_PHONE", tvPhone.text.toString().replace("SĐT: ", ""))
+                putExtra("EXTRA_EMAIL", tvEmail.text.toString().replace("Email: ", ""))
+                putExtra("EXTRA_AVATAR_URI", currentAvatarUri)
             }
-            // Kích hoạt chuyển Activity con
-            editLauncher.launch(intent)
+            editProfileLauncher.launch(intent)
+        }
+
+        // Implicit Intent quay số gọi điện
+        btnCall.setOnClickListener {
+            val phone = tvPhone.text.toString().replace("SĐT: ", "").trim()
+            val dialIntent = Intent(Intent.ACTION_DIAL).apply {
+                data = Uri.parse("tel:$phone")
+            }
+            try {
+                startActivity(dialIntent)
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, "Không có ứng dụng gọi điện!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Implicit Intent gửi Email
+        btnEmail.setOnClickListener {
+            val email = tvEmail.text.toString().replace("Email: ", "").trim()
+            val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:$email")
+                putExtra(Intent.EXTRA_SUBJECT, "Báo cáo thực hành Android UTE")
+            }
+            try {
+                startActivity(Intent.createChooser(emailIntent, "Chọn ứng dụng gửi mail"))
+            } catch (e: ActivityNotFoundException) {
+                Toast.makeText(this, "Không có ứng dụng gửi email!", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }
